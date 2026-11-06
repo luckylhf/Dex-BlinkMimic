@@ -5,8 +5,11 @@
 /test/
 
 # 超过 GitHub 单文件 100MB 限制的展示视频
-牛逼效果展示/run1_subject5_checkpoint_012659_reference_policy.mp4
-牛逼效果展示/walk1_subject5_checkpoint_012659_reference_policy.mp4
+/牛逼效果展示/
+
+# Python
+__pycache__/
+*.py[cod]
 
 # macOS
 .DS_Store
