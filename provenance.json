@@ -1,0 +1,10 @@
+{
+  "training_core": "BlinkMimic",
+  "robot": "Dex",
+  "data_lifecycle": "human input -> external Dex-Retarget conversion and acceptance -> verified training NPZ import -> Blink features",
+  "initialization": "fresh",
+  "evaluation_history": "new",
+  "conversion_repository": "https://github.com/luckylhf/Dex-Retarget",
+  "conversion_execution": "external; no bundled solver",
+  "historical_artifacts": "Existing frozen data, checkpoints and evaluations retain their original provenance"
+}

@@ -1,0 +1,22 @@
+{
+  "robot": "dex",
+  "num_envs": 8192,
+  "pi_batch": 3072,
+  "wm_batch": 3072,
+  "buffer_steps": 512,
+  "horizon": 16,
+  "wm_window": 8,
+  "wm_batches": 5,
+  "pi_ema": 0.995,
+  "root_feedback": true,
+  "root_reward": 0.2,
+  "pi_ref_skip": true,
+  "wm_structured": true,
+  "wm_mirror": 0.0,
+  "contact_reward": 0.0,
+  "lr": 0.0004,
+  "wm_only_iters": 100,
+  "fail_reset": 0.3,
+  "bin_fix": true,
+  "iterations": 3500
+}

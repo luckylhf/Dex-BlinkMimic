@@ -1,0 +1,21 @@
+{
+  "evaluation_profile": "jump_tracking_v2",
+  "reference_preprocessing": "supermimic_12341_three_tests_v1",
+  "references": {
+    "gbtc": {
+      "reference": "references/gbtc.npz",
+      "reference_sha256": "dae551fb1746a878035623ad2a580d2013e01884dae15c136085009ef590e229",
+      "training_member": false
+    },
+    "dance_boy": {
+      "reference": "references/dance_boy.npz",
+      "reference_sha256": "70a03385f05be0b4c2d4d6ff9ea8dd0450a19b701729f4b8a48ee45a43a9247f",
+      "training_member": false
+    },
+    "dance_girl": {
+      "reference": "references/dance_girl.npz",
+      "reference_sha256": "cade6a483f4f999e1893ad186561dab8a7e5aa5a20afd53955cd9e033d25e98f",
+      "training_member": false
+    }
+  }
+}

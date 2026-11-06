@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68","wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dex-mimic"
+version = "1.0.0"
+description = "Dex humanoid whole-body tracking with a BlinkMimic training core"
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "DEX_THIRD_PARTY.md"]
+readme = "README.md"
+authors = [{ name = "Fuyi Chen" }]
+requires-python = ">=3.10,<3.13"
+dependencies = ["numpy>=1.26,<3", "mujoco>=3.11,<3.17", "onnxruntime"]
+
+[project.optional-dependencies]
+train = ["mjlab==1.6.0", "torch>=2.7.0", "matplotlib", "pillow", "onnx", "scipy", "psutil", "imageio", "imageio-ffmpeg"]
+video = ["pillow", "imageio", "imageio-ffmpeg"]
+
+
+[tool.uv]
+required-environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
+# CUDA 12.8 torch (Blackwell-capable); pinned to versions tested with this code.
+constraint-dependencies = ["torch==2.9.0", "warp-lang==1.16.0", "mujoco==3.11.0", "mujoco-warp==3.11.0", "numpy==2.4.6; python_version >= '3.11'", "numpy==1.26.4; python_version < '3.11'"]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+
+[project.scripts]
+dex-mimic = "dex_mimic.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
