@@ -134,15 +134,16 @@ class MDP:
         p, R, v, w, q, qd = S
         bp, bR, bv, bw = self.kin.forward(p, R, v, w, q, qd)
         rp, rR = m.root_p[f], m.root_R[f]
+        rbp, rbR, rbv, rbw = m.body_state(f)
         # reference bodies re-anchored to the robot's root (xy + yaw), as in BeyondMimic
         dR = yaw_mat(mm3(R, rR.transpose(-1, -2)))
         anchor = torch.cat((p[..., :2], rp[..., 2:3]), -1)
-        ref_bp = anchor.unsqueeze(-2) + mv3(dR.unsqueeze(-3), m.body_p[f] - rp.unsqueeze(-2))
-        ref_bR = mm3(dR.unsqueeze(-3), m.body_R[f])
+        ref_bp = anchor.unsqueeze(-2) + mv3(dR.unsqueeze(-3), rbp - rp.unsqueeze(-2))
+        ref_bR = mm3(dR.unsqueeze(-3), rbR)
         e_pos = ((ref_bp - bp) ** 2).sum(-1).mean(-1)
         e_ori = rot_angle_sq(ref_bR, bR).mean(-1)
-        e_lv = ((m.body_v[f] - bv) ** 2).sum(-1).mean(-1)
-        e_av = ((m.body_w[f] - bw) ** 2).sum(-1).mean(-1)
+        e_lv = ((rbv - bv) ** 2).sum(-1).mean(-1)
+        e_av = ((rbw - bw) ** 2).sum(-1).mean(-1)
         e_rp = ((rp - p) ** 2).sum(-1)
         e_ro = rot_angle_sq(rR, R)
         r_track = (
@@ -157,7 +158,7 @@ class MDP:
         r_lim = (torch.relu(q - self.soft_hi) + torch.relu(self.soft_lo - q)).sum(-1)
         r = (r_track + c.w_action_rate * r_rate + c.w_joint_limit * r_lim) * CONTROL_DT
         if w_contact > 0:
-            fz, rz = bp[..., self.feet, 2], m.body_p[f][..., self.feet, 2]
+            fz, rz = bp[..., self.feet, 2], rbp[..., self.feet, 2]
             c_sim = torch.sigmoid((self.contact_z - fz) / 0.005)
             rc = getattr(m, "ref_contact", None)  # MotionLib.set_ref_contact (--ref_contact_fix), else the fixed 4.5 cm
             c_ref = rc[f] if rc is not None else (rz < self.contact_z).float()
@@ -200,10 +201,11 @@ class MDP:
         H = yaw_mat(R)
         Ht = H.transpose(-1, -2)
         rp, rR = m.root_p[f], m.root_R[f]
+        rbp, rbR, rbv, rbw = m.body_state(f)
         bp = self.kin.forward(p, R, v, w, q, qd)[0]
         dR = yaw_mat(mm3(R, rR.transpose(-1, -2)))
         anchor = torch.cat((p[..., :2], rp[..., 2:3]), -1)
-        ref_bp = anchor.unsqueeze(-2) + mv3(dR.unsqueeze(-3), m.body_p[f] - rp.unsqueeze(-2))
+        ref_bp = anchor.unsqueeze(-2) + mv3(dR.unsqueeze(-3), rbp - rp.unsqueeze(-2))
         e_body = mv3(Ht.unsqueeze(-3), ref_bp - bp).flatten(-2)
         e_root = mv3(Ht, rp - p)
         rel = mat_to_6d(mm3(R.transpose(-1, -2), rR))

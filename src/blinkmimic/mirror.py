@@ -48,3 +48,36 @@ class Mirror:
         c = self.xi_slices["com"]
         out[..., c.start + 1] = -xi[..., c.start + 1]  # lateral COM offset
         return out
+
+
+def mirror_windows(w, mirror, n, bounds=None, diagnostics=None):
+    """Mirror exactly n windows; optional Dex-only asymmetric-limit support.
+
+    Original windows remain uniform replay draws. The augmented half is selected
+    from physically valid support; continuity masks follow the selected windows.
+    Symmetric joints need no restriction, including symmetric limit contacts.
+    """
+    from .mdp import flatten_state, unflatten_state
+    out=dict(w);indices=slice(0,n);batch=w['s'].shape[0]
+    if bounds is not None:
+        lo,hi=bounds;J=len(mirror.perm)
+        assert w['s'].shape[-1]==13+2*J
+        q0,q1=w['s'][...,13:13+J],w['s1'][...,13:13+J]
+        eligible=((q0>=lo)&(q0<=hi)&(q1>=lo)&(q1<=hi)).all(-1).all(-1)
+        count=eligible.sum()
+        torch._assert_async(count>0,'No physically valid Dex mirror windows in replay batch')
+        ranked=torch.argsort((~eligible).to(torch.int32),stable=True)
+        indices=ranked[torch.arange(n,device=w['s'].device)%count.clamp(min=1)]
+        if diagnostics is not None:
+            diagnostics['eligible'].add_(count)
+            diagnostics['replacement_batches'].add_((count<n).long())
+        for key in ('mask','cut'):
+            if key in w:out[key]=torch.cat((w[key][indices],w[key][n:]))
+    elif diagnostics is not None:
+        diagnostics['eligible'].add_(batch)
+    if diagnostics is not None:
+        diagnostics['batches'].add_(1);diagnostics['mirrored'].add_(n)
+    ms=lambda x:flatten_state(mirror.state(unflatten_state(x)))
+    for key,fn in [('s',ms),('s1',ms),('a',mirror.joints),('a_prev',mirror.joints),('xi',mirror.xi)]:
+        out[key]=torch.cat((fn(w[key][indices]),w[key][n:]))
+    return out

@@ -55,6 +55,9 @@ def _sim_reset(self, env_ids=None) -> None:  # mjlab Simulation.reset without ho
 
 EntityData.clear_state, Simulation.reset = _clear_state, _sim_reset
 
+from .capture_compat import install_capture_preallocation
+install_capture_preallocation()
+
 DECIMATION = 4  # 4 physics substeps of 5 ms per 50 Hz control step
 PHYSICS_DT = CONTROL_DT / DECIMATION
 

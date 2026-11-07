@@ -112,6 +112,9 @@ class MotionLib:
             lib.bin_prior /= lib.bin_prior.sum()
         return lib
 
+    def body_state(self, f):
+        return self.body_p[f], self.body_R[f], self.body_v[f], self.body_w[f]
+
     def set_ref_contact(self, feet: list[int], margin: float = 0.015, vmax: float = 0.5, q: float = 0.05) -> None:
         """Speed-branch reference foot contact (num_frames, len(feet)): height below the clip's own floor (the
         q-quantile of that foot's height in the clip) + margin, and horizontal speed below vmax. A fixed 4.5 cm

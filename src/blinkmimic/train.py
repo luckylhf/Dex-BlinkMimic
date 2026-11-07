@@ -131,6 +131,12 @@ parser.add_argument("--resume", type=str, default=None)
 parser.add_argument("--amp", type=str, default="bf16", choices=["none", "bf16"], help="autocast dtype for MLP matmuls")
 parser.add_argument("--root_feedback",action="store_true")
 parser.add_argument("--root_reward",type=float,default=0.)
+parser.add_argument('--mlp_checkpoint',action='store_true',help='Recompute stateless MLP activations in backward, preserving logical batches and RNG')
+parser.add_argument('--mirror_valid_windows',action='store_true',help='Dex: select half-batch mirror windows within asymmetric joint limits')
+parser.add_argument('--critic_features_by_step',action='store_true',help='Construct identical detached critic features per time step, retaining whole-batch normalization/GAE/critic inference')
+parser.add_argument('--share_graph_pool',action='store_true',help='Share the sequential collection/WM/policy CUDA graph pool; probe remains independent')
+parser.add_argument('--compact-reference',help='Frozen full-library compact.pt with persistent frame IDs')
+parser.add_argument('--eprobe_max_worlds',type=int,default=0,help='Bounded probe pool; 0 = upstream all tiles at once, otherwise cycle tiles')
 parser.add_argument('--data-release')
 parser.add_argument('--switch-seconds',type=float,default=150.)
 parser.add_argument('--switch-warmup-steps',type=int,default=64)
@@ -139,10 +145,12 @@ parser.add_argument('--evaluation-queue')
 parser.add_argument('--stop-file')
 parser.add_argument('--skip-evaluation',action='store_true')
 args = parser.parse_args()
+if args.compact_reference and args.data_release: parser.error("Choose a frozen compact reference or legacy rotating shards")
 if args.data_release and (args.cuda_graph or args.graph_early or args.collect_graph or args.reset_masked or args.eprobe_share):
     parser.error('Bounded shards currently require graphs and probe sweeps disabled. Their frame-index lifetimes must be revalidated together.')
 
 os.environ["DEX_ROOT_FEEDBACK"]="1" if args.root_feedback else "0"
+os.environ["DEX_CAPTURE_ARENA"]="1" if (args.collect_graph or args.eprobe_graph) else "0"
 
 import torch
 import torch.nn as nn
@@ -156,7 +164,7 @@ from blinkmimic.motion import CONTROL_DT, MotionLib
 import blinkmimic.networks as networks
 import blinkmimic.rotations as rotations
 from blinkmimic.networks import Critic, Policy, WorldModel, check_pruned, policy_kwargs
-from blinkmimic.mirror import Mirror
+from blinkmimic.mirror import Mirror, mirror_windows
 from blinkmimic.objective import actor_objective
 from blinkmimic.mdp import flatten_state
 from blinkmimic.robot import get_robot
@@ -166,6 +174,7 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 torch.manual_seed(args.seed)
 networks.AMP_DTYPE = torch.bfloat16 if args.amp == "bf16" else None
+networks.MLP_CHECKPOINT = args.mlp_checkpoint
 dev = "cuda:0"
 os.makedirs(args.log_dir, exist_ok=True)
 json.dump(vars(args), open(os.path.join(args.log_dir, "args.json"), "w"), indent=2)
@@ -178,6 +187,9 @@ if args.data_release:
     from dex_mimic.training.hooks import initialize
     reference_rotation,checkpoint_ready,requested_stop=initialize(args)
     motion=reference_rotation.initial(dev)
+elif args.compact_reference:
+    from dex_mimic.data.compact_motion import CompactMotionLib
+    motion=CompactMotionLib(args.compact_reference,kin,dev)
 else:
     motion=MotionLib.from_dir(args.motion_dir or robot.motion_dir,robot,kin,dev)
 layout = XiLayout(robot, dev)
@@ -198,6 +210,7 @@ pi = Policy(mdp.obs_dim, GOAL_DIM, J, hist=Hh, enc_hidden=widths(args.enc_hidden
             **policy_kwargs(vars(args), robot)).to(dev)
 critic = Critic(CRITIC_IN).to(dev)
 GRAPH = args.cuda_graph
+TRAIN_GRAPH_POOL = torch.cuda.graph_pool_handle() if GRAPH and args.share_graph_pool else None
 if GRAPH:
     assert args.no_sync and args.fused_adam, "--cuda_graph needs --no_sync --fused_adam"
     assert not pipe.stateful, "--cuda_graph: not with stateful sensing"
@@ -368,15 +381,18 @@ def set_requires_grad(m: nn.Module, flag: bool):
 
 # ------------------------------------------------------------------------------------------------
 mirror = Mirror(robot, layout.slices, dev) if args.wm_mirror > 0 else None
+MIRROR_DIAG={k:torch.zeros((),device=dev,dtype=torch.long) for k in ['batches','eligible','mirrored','replacement_batches']}
+if mirror is not None:
+    reflected_lo=torch.minimum(kin.q_lo[mirror.perm]*mirror.sign,kin.q_hi[mirror.perm]*mirror.sign)
+    reflected_hi=torch.maximum(kin.q_lo[mirror.perm]*mirror.sign,kin.q_hi[mirror.perm]*mirror.sign)
+    asymmetric=(abs(kin.q_lo-reflected_lo)>1e-6)|(abs(kin.q_hi-reflected_hi)>1e-6)
+    mirror_lo=torch.where(asymmetric,torch.maximum(kin.q_lo,reflected_lo)+.005,-torch.inf)
+    mirror_hi=torch.where(asymmetric,torch.minimum(kin.q_hi,reflected_hi)-.005,torch.inf)
 
 
 def _mirror_windows(w: dict, n: int) -> dict:
     """Replace the first n windows by their mirror images (states, actions, sim context)."""
-    out = dict(w)
-    ms = lambda x: flatten_state(mirror.state(unflatten_state(x)))  # noqa: E731
-    for k, fn in (("s", ms), ("s1", ms), ("a", mirror.joints), ("a_prev", mirror.joints), ("xi", mirror.xi)):
-        out[k] = torch.cat((fn(w[k][:n]), w[k][n:]))
-    return out
+    return mirror_windows(w,mirror,n,(mirror_lo,mirror_hi) if args.mirror_valid_windows else None,MIRROR_DIAG)
 
 
 def wm_update():
@@ -447,7 +463,7 @@ class Graphed:
             torch.cuda.empty_cache()  # return the eager phase's cached blocks before the graph takes its own pool
             t0 = time.time()
             self.graph = torch.cuda.CUDAGraph()
-            with torch.cuda.graph(self.graph):
+            with torch.cuda.graph(self.graph, pool=TRAIN_GRAPH_POOL):
                 self.out = self.fn()
             torch.cuda.synchronize()
             print(f"cuda_graph: captured {self.fn.__name__} in {time.time() - t0:.1f} s, "
@@ -525,17 +541,29 @@ def policy_update():
             pi_avg.update_parameters(pi)
     set_requires_grad(wm, True)
     set_requires_grad(critic, True)
+    loss=loss.detach(); c=c.detach()
+    del J,c_t,v_boot,r,d
     # ---------------- critic: GAE(lambda) targets over the imagined transitions ----------------
     v_loss = torch.zeros(())
+    del S_all,f_all,As,Aps
     with torch.no_grad():
-        S_c = tuple(torch.cat((S0[i].unsqueeze(0), torch.stack([St[i].detach() for St in Ss])), 0).flatten(0, 1) for i in range(6))
-        f_c = torch.cat((s["f"].unsqueeze(0), torch.stack(Fs)), 0).flatten()
-        g_c = torch.cat((g0.unsqueeze(0), torch.stack(Gs)), 0).flatten(0, 1)
-        xi_c = xi_n.unsqueeze(0).expand(HZ + 1, -1, -1).flatten(0, 1)
-        X = critic_input_c(S_c, f_c, xi_c, g_c).view(HZ + 1, B, -1)
+        if args.critic_features_by_step:
+            X=torch.empty(HZ+1,B,CRITIC_IN,device=dev)
+            X[0].copy_(critic_input_c(S0,s['f'],xi_n,g0))
+            for t in range(HZ):
+                X[t+1].copy_(critic_input_c(tuple(x.detach() for x in Ss[t]),Fs[t],xi_n,Gs[t]))
+                Ss[t]=Gs[t]=None
+        else:
+            S_c=tuple(torch.cat((S0[i].unsqueeze(0),torch.stack([St[i].detach() for St in Ss])),0).flatten(0,1) for i in range(6))
+            f_c=torch.cat((s['f'].unsqueeze(0),torch.stack(Fs)),0).flatten()
+            g_c=torch.cat((g0.unsqueeze(0),torch.stack(Gs)),0).flatten(0,1)
+            xi_c=xi_n.unsqueeze(0).expand(HZ+1,-1,-1).flatten(0,1)
+            X=critic_input_c(S_c,f_c,xi_c,g_c).view(HZ+1,B,-1)
+            del S_c,f_c,g_c
+    del Gs,Ss,Fs
     critic.norm.update(X)
     with torch.no_grad():
-        targets = (gae_targets_c if args.fused_adam else _gae_targets)(critic(X), rews, dones)  # (H, B)
+        targets=(gae_targets_c if args.fused_adam else _gae_targets)(critic(X),rews,dones)
     Xf, Yf = X[:-1].reshape(-1, X.shape[-1]), targets.reshape(-1)
     n = Xf.shape[0]
     mb = n // args.critic_minibatches
@@ -623,7 +651,7 @@ def collect_graphed_step():
         setitem, env.sim.use_cuda_graph = TorchArray.__setitem__, False  # as eprobe_sweep_graphed
         TorchArray.__setitem__ = lambda self, idx, value: self._tensor.__setitem__(idx, value)
         try:
-            with torch.cuda.graph(CG["graph"], capture_error_mode="thread_local"):
+            with torch.cuda.graph(CG["graph"], pool=TRAIN_GRAPH_POOL, capture_error_mode="thread_local"):
                 ws = wp.stream_from_torch(torch.cuda.current_stream())
                 with wp.ScopedStream(ws, sync_enter=False, sync_exit=False):
                     wp.capture_begin(stream=ws, external=True)
@@ -707,9 +735,11 @@ else:
 
 EPROBE = args.eprobe_share > 0  # --eprobe_share; off: code path and random stream unchanged
 if EPROBE:
-    EP_TILE = torch.cat([torch.arange(int(motion.clip_start[c]), int(motion.clip_end[c]) - 1, args.eprobe_tile)
-                         for c in range(len(motion.names))]).to(dev)  # fmt: skip
-    P_EP = len(EP_TILE)
+    EP_ALL_TILE = torch.cat([torch.arange(s, e - 1, args.eprobe_tile)
+                             for s,e in zip(motion.clip_start.cpu().tolist(),motion.clip_end.cpu().tolist())]).to(dev)
+    P_EP = min(len(EP_ALL_TILE),args.eprobe_max_worlds) if args.eprobe_max_worlds else len(EP_ALL_TILE)
+    EP_TILE = EP_ALL_TILE[:P_EP].clone()
+    EP_CURSOR = [0]
     assert pi_avg is not None, "--eprobe_share sweeps the EMA policy: needs --pi_ema"
     assert not args.eprobe_async or args.eprobe_graph, "--eprobe_async needs --eprobe_graph"
     EP_PI = copy.deepcopy(pi_avg.module) if args.eprobe_async else pi_avg.module  # sweep policy (async: a snapshot)
@@ -821,6 +851,9 @@ def eprobe_burst(it):
     failures update EP_FAIL; the focus reset distribution of the training simulator becomes the failure weights spread over
     the --eprobe_win bins before each failure."""
     m, P = motion, P_EP
+    tile_ids = (torch.arange(P,device=dev)+EP_CURSOR[0]) % len(EP_ALL_TILE)
+    EP_TILE.copy_(EP_ALL_TILE[tile_ids])
+    EP_CURSOR[0] += P
     t0 = time.time()
     cid = m.clip_id[EP_TILE]
     lead = int(torch.randint(args.eprobe_lead_min, args.eprobe_lead_max + 1, (1,)))
@@ -828,6 +861,7 @@ def eprobe_burst(it):
     # a probe is done at its tile end or at the clip's last frame (the full evaluation also checks the last transition);
     # finished probes keep stepping with the frame capped so that f + 1 stays in the clip
     stop = torch.minimum(EP_TILE + args.eprobe_tile, m.clip_end[cid])
+    probe_steps = min(lead + args.eprobe_tile, int((stop - f0).max())) if args.eprobe_max_worlds else lead + args.eprobe_tile
     fcap = torch.minimum(stop, m.clip_end[cid] - 1)
     ids = torch.arange(P, device=dev)
     penv.done_eval[:] = False
@@ -836,12 +870,12 @@ def eprobe_burst(it):
     if args.eprobe_async:
         avg = list(pi_avg.module.parameters()) + list(pi_avg.module.buffers())
         torch._foreach_copy_(list(EP_PI.parameters()) + list(EP_PI.buffers()), avg)
-        EP_ASYNC.update(it=it, lead=lead, t0=t0, left=eprobe_graph_setup(lead + args.eprobe_tile, stop, fcap), first=True)
+        EP_ASYNC.update(it=it, lead=lead, t0=t0, left=eprobe_graph_setup(probe_steps, stop, fcap), first=True)
         return
     if args.eprobe_graph:
-        fail_f = eprobe_sweep_graphed(lead + args.eprobe_tile, stop, fcap)
+        fail_f = eprobe_sweep_graphed(probe_steps, stop, fcap)
     else:
-        fail_f = eprobe_sweep_eager(lead + args.eprobe_tile, stop, fcap)
+        fail_f = eprobe_sweep_eager(probe_steps, stop, fcap)
     eprobe_finish(it, lead, t0, fail_f)
 
 
@@ -883,6 +917,8 @@ def eprobe_finish(it, lead, t0, fail_f):
             q += w
         env.set_focus(q / q.sum(), args.eprobe_share)
     nf = int((fail_f >= 0).sum())
+    with open(os.path.join(args.log_dir,"probe_coverage.jsonl"),"a") as pf:
+        pf.write(json.dumps(dict(iteration=it,total_tiles=len(EP_ALL_TILE),probe_worlds=P,tiles_visited=min(EP_CURSOR[0],len(EP_ALL_TILE)),cursor=EP_CURSOR[0],failed_worlds=nf))+"\n")
     fl = sorted({(m.names[int(m.clip_id[f])].replace("_subject", "_s"), int(f - m.clip_start[m.clip_id[f]])) for f in fail_f[fail_f >= 0].tolist()})
     lag = f" | applied at it {ITER_NOW[0]}" if args.eprobe_async else ""
     print(f"--eprobe it {it}: lead {lead} | {nf}/{P} failures {fl[:8]} | {time.time() - t0:.1f} s{lag}", flush=True)
@@ -921,12 +957,22 @@ POLICY_START = args.wm_only_iters if (start_it > 0 or args.wm_only_iters == 0) e
 DECAY_AT = [None]  # --lr_decay_ret: iteration of the trigger
 if RESUME_CTRL is not None:
     DECAY_AT[0] = RESUME_CTRL["decay_at"]
+    if EPROBE: EP_CURSOR[0] = RESUME_CTRL.get("ep_cursor",0)
     if EPROBE and RESUME_CTRL.get("ep_fail") is not None:
         EP_FAIL.copy_(RESUME_CTRL["ep_fail"].to(dev))
     if RESUME_CTRL.get("focus_q") is not None:
         env.set_focus(RESUME_CTRL["focus_q"].to(dev), RESUME_CTRL["focus_share"])
     print(f"--resume: LR trigger at {DECAY_AT[0]}, focus {'set' if RESUME_CTRL.get('focus_q') is not None else 'none'}", flush=True)
 
+
+# A zero-update live-policy snapshot after the initial simulator collection.
+# EMA has not received an update yet; use the live normalization buffers for both
+# exported actor fields in this diagnostic snapshot without modifying training.
+if start_it == 0:
+    torch.save(dict(pi=pi.state_dict(),pi_live=pi.state_dict(),wm=wm.state_dict(),
+                    iteration=0,wall_time=time.time()-t_start,sim_steps=sim_steps,args=vars(args),
+                    snapshot_kind="zero_update_live_after_initial_collection"),
+               os.path.join(args.log_dir,"ckpt_000000.pt"))
 
 for it in range(start_it, args.iterations):
     if reference_rotation is not None:
@@ -1008,7 +1054,8 @@ for it in range(start_it, args.iterations):
               "wall_time": time.time() - t_start, "sim_steps": sim_steps, "args": vars(args),
               "pi_avg": pi_avg.state_dict() if pi_avg is not None else None,
               "saved_at": time.strftime("%Y-%m-%d %H:%M:%S")}  # fmt: skip
-        ck["ctrl"] = {"decay_at": DECAY_AT[0], "ep_fail": EP_FAIL.cpu() if EPROBE else None,
+        ck["mirror_diagnostics"]={k:int(v) for k,v in MIRROR_DIAG.items()}
+        ck["ctrl"] = {"ep_cursor": EP_CURSOR[0] if EPROBE else 0,"decay_at": DECAY_AT[0], "ep_fail": EP_FAIL.cpu() if EPROBE else None,
                       "focus_q": env.focus_q.cpu() if env.focus_q is not None else None,
                       "focus_share": float(env.focus_share_t) if env.focus_static else env.focus_share,
                       "env_bins": {"bin_G": env.bin_G.cpu(), "bin_fail": env.bin_fail.cpu(), "bin_w_avg": env.bin_w_avg.cpu()}}  # fmt: skip

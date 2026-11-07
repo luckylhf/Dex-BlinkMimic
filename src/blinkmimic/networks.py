@@ -67,11 +67,17 @@ class RunningNorm(nn.Module):
 AMP_DTYPE: torch.dtype | None = None
 
 
+MLP_CHECKPOINT = False
+
+
 def run_mlp(net: nn.Module, x: torch.Tensor) -> torch.Tensor:
-    if AMP_DTYPE is None:
-        return net(x)
-    with torch.autocast("cuda", dtype=AMP_DTYPE):
-        return net(x).float()
+    def forward(value):
+        if AMP_DTYPE is None:return net(value)
+        with torch.autocast('cuda',dtype=AMP_DTYPE):return net(value).float()
+    if MLP_CHECKPOINT and torch.is_grad_enabled():
+        from torch.utils.checkpoint import checkpoint
+        return checkpoint(forward,x,use_reentrant=False,preserve_rng_state=False)
+    return forward(x)
 
 
 class WorldModel(nn.Module):
