@@ -20,11 +20,15 @@ run_dir=$(cat deployment/current_run.txt)
 tail -f "$run_dir/stdout.log"
 ```
 
-对已确认正在运行的任务，在对应目录写入 `STOP`，训练会在迭代边界保存并退出：
+### 停止与续训时限
+
+启动时须传入 `--stop-file "$run_dir/STOP"`，随后写入该文件，训练才会在迭代边界保存并退出。主 README 示例、`train_package_config.sh` 和 `run_recipe_fresh.py` 均已指定；自行拼接命令时也要传入：
 
 ```bash
 touch "$run_dir/STOP"
 ```
+
+`--resume` 恢复后，`--max_hours` 按 **checkpoint 的 `wall_time` + 本次训练时间**判断，单位为小时。它不是新增训练时长：已有 42 分钟、希望再训 30 分钟，应传累计上限 `--max_hours 1.2`；传 `0.5` 会在恢复后的迭代检查处触发保存退出。该参数不改变迭代上限，续训还须确保 `--iterations` 大于恢复的迭代数。
 
 `environment_setup.log`、`environment_freeze.txt`、`preflight.json` 保存环境记录；每轮的 `args.json` 保存生效参数。16 GiB vGPU 的显存适配见配方文档，耗时以实际运行记录为准。
 

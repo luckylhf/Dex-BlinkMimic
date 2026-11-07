@@ -64,12 +64,26 @@ Dex 腰 yaw 限位不对称。镜像样本只选当前/下一帧均在对称可�
 
 需具备冻结数据及训练环境，所有输出使用新目录。在项目根目录依次执行或核对：
 
-1. 用 `freeze_recipe_dataset.py` 准备快照，保留去重结果和原质量标签；输入要求见 `--help`。
+1. 用 `freeze_recipe_dataset.py` 准备快照，显式传入 `--lafan-labels`，保留去重结果和原质量标签；命令见下方。
 2. 用 `check_recipe_environment.py --dataset /path/to/frozen --build --report /path/to/new_preflight.json` 构建 `compact.pt` 并检查环境。检查包括镜像、足底几何、普通/紧凑参考的 goal、FK、接触、奖励与梯度一致性，以及仿真状态读回和有限数值。
-3. 按 `run_recipe_smoke.py` 的参数完成小规模及全配置 CUDA 图短测，覆盖探测轮换、Muon、保存与恢复；保留显存、特征和梯度对照报告。
+3. 按 `run_recipe_smoke.py` 的参数完成小规模及全配置 CUDA 图短测，覆盖探测轮换、Muon、保存与加载校验；保留显存、特征和梯度对照报告。
 4. 检查通过后，从主 README 的命令启动新训练，保存 `args.json`、数据/代码/模型哈希、零更新模型、checkpoint 和资源日志。
 
 这些脚本使用已安装训练依赖的 Python，并设置 `PYTHONPATH=src`。`run_recipe_fresh.py` 是本次实验的专用启动器：其中检查回执路径固定为 11 月 7 日实验目录；复现前需准备对应材料，不能把它当作任意数据目录的通用启动器。
+
+### 冻结输入示例
+
+```bash
+PYTHONPATH=src .venv/bin/python deployment/freeze_recipe_dataset.py \
+  --batches /path/to/BONES/batches \
+  --lafan /path/to/LAFAN/motions \
+  --lafan-labels deployment/all77_data_receipt.json \
+  --out data/frozen/new_recipe
+```
+
+`--batches` 下应有 `Retarget_*/accepted.json`；`--lafan` 须有完整的 77 个训练 NPZ。`--lafan-labels` 是含 `motions` 列表的 JSON，每条 LAFAN 记录须含 `name`、`training_sha256`、`original_quality_status`、`original_quality_flags`；混合清单用 `corpus: "lafan"` 标识 LAFAN 条目。
+
+包内 `all77_data_receipt.json` 可用于对应的历史 77 条输入，文件名和 SHA-256 必须一致；换过输入时须提供匹配的新回执。脚本在创建输出目录前检查动作数量、标签完整性及文件哈希，原样保留 accepted/review 标签和 flags，并将标签清单复制为 `lafan_quality_labels.json`、在 manifest 中登记哈希。无需补造旧 `data/mixed/.../manifest.json`。
 
 ## 评测与已完成结果
 

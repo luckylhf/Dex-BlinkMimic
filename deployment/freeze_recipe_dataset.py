@@ -10,11 +10,9 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
-import time
 
 import numpy as np
 
-from blinkmimic.dex.dex_constants import MANIFEST, load_dex_npz
 from dex_mimic.common import atomic, sha
 
 
@@ -30,15 +28,63 @@ def content_hash(p, quat, joints):
     return h.hexdigest()
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument('--batches', required=True)
-    ap.add_argument('--lafan', required=True)
-    ap.add_argument('--out', required=True)
-    a = ap.parse_args()
+def lafan_inputs(directory, labels_path):
+    """Bind the 77 historical quality labels to the exact files before copying."""
+    directory, labels_path = Path(directory).expanduser().resolve(), Path(labels_path).expanduser().resolve()
+    files = sorted(directory.glob('*.npz'))
+    if len(files) != 77:
+        raise ValueError(f'Expected exactly 77 LAFAN NPZ files in {directory}; found {len(files)}')
+    payload = labels_path.read_bytes()
+    report = json.loads(payload)
+    if not isinstance(report, dict) or not isinstance(report.get('motions'), list):
+        raise ValueError('LAFAN labels must contain a motions list')
+    labels = {}
+    for row in report['motions']:
+        if not isinstance(row, dict):
+            raise ValueError('Each quality label must be an object')
+        if row.get('corpus', 'lafan') != 'lafan':
+            continue
+        name = row.get('name')
+        flags = row.get('original_quality_flags')
+        digest = row.get('training_sha256')
+        if (not isinstance(name, str) or not name or name in labels
+                or row.get('original_quality_status') not in ('accepted', 'review')
+                or not isinstance(flags, list) or not all(isinstance(f, str) for f in flags)
+                or not isinstance(digest, str) or len(digest) != 64
+                or any(c not in '0123456789abcdef' for c in digest)):
+            raise ValueError(f'Invalid or duplicate LAFAN quality label: {name!r}')
+        labels[name] = row
+    names = {f.stem for f in files}
+    if names != labels.keys():
+        raise ValueError(f'LAFAN files/labels differ: missing labels={sorted(names-labels.keys())}; '
+                         f'extra labels={sorted(labels.keys()-names)}')
+    for path in files:
+        if sha(path) != labels[path.stem]['training_sha256']:
+            raise ValueError('LAFAN file differs from its quality receipt: ' + path.name)
+    return files, labels, hashlib.sha256(payload).hexdigest()
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('--batches', required=True, help='Parent directory containing Retarget_*/accepted.json')
+    ap.add_argument('--lafan', required=True, help='Directory containing the 77 LAFAN training NPZs')
+    ap.add_argument('--lafan-labels', required=True,
+                    help='JSON quality receipt with motions[].name, original_quality_status, '
+                         'original_quality_flags and training_sha256; '
+                         'e.g. deployment/all77_data_receipt.json')
+    ap.add_argument('--out', required=True, help='New frozen dataset directory; must not exist')
+    a = ap.parse_args(argv)
+    lafan_files, labels, labels_sha256 = lafan_inputs(a.lafan, a.lafan_labels)
+    # Keep --help and input preflight independent of the GPU training stack.
+    from blinkmimic.dex.dex_constants import MANIFEST, load_dex_npz
+
     out = Path(a.out).resolve(); out.mkdir(parents=True, exist_ok=False)
     motions = out/'motions'; motions.mkdir()
     snapshots = out/'catalog_snapshots'; snapshots.mkdir()
+    labels_copy = out/'lafan_quality_labels.json'
+    shutil.copyfile(Path(a.lafan_labels).expanduser(), labels_copy)
+    if sha(labels_copy) != labels_sha256:
+        raise ValueError('LAFAN quality receipt changed during copy')
     candidates, excluded, rows = [], [], []
     for catalog in sorted(Path(a.batches).glob('Retarget_*/accepted.json')):
         snapshot = snapshots/(catalog.parent.name+'.json')
@@ -86,13 +132,12 @@ def main():
         seen_source[source_id] = seen_file[e['training_sha256']] = seen_content[ch] = name
         if len(rows)%500 == 0:
             print('FROZEN_BONES',len(rows),'candidate',i+1,'/',len(candidates),flush=True)
-    lafan = Path(a.lafan)
-    legacy=Path(__file__).resolve().parents[1]/'data/mixed/lafan77_bones080_20261106/manifest.json'
-    labels={r['name']:r for r in json.loads(legacy.read_text())['motions'] if r['corpus']=='lafan'}
-    for src in sorted(lafan.glob('*.npz')):
+    for src in lafan_files:
         p,q,j,fps = load_dex_npz(src); dst = motions/src.name
         assert not dst.exists(); shutil.copy2(src,dst)
-        # Preserve the original exploratory quality record from the prior frozen manifest.
+        if sha(dst) != labels[src.stem]['training_sha256']:
+            raise ValueError('LAFAN file changed during copy: ' + src.name)
+        # Preserve the supplied historical quality decision without regrading it.
         rows.append(dict(name=src.stem,corpus='lafan',training_file=dst.name,training_sha256=sha(dst),
                          source=str(src),frames=len(j),bins=(len(j)-2)//50+1,fps=fps,
                          original_quality_status=labels[src.stem]['original_quality_status'],
@@ -107,6 +152,8 @@ def main():
                 clips=len(rows),frames=sum(r['frames'] for r in rows),bins=sum(r['bins'] for r in rows),
                 corpora={c:dict(clips=sum(r['corpus']==c for r in rows),frames=sum(r['frames'] for r in rows if r['corpus']==c)) for c in ('lafan','bones')},
                 exclusion_counts=dict(Counter(r['reason'] for r in excluded)),
+                lafan_quality_labels=dict(file=labels_copy.name, sha256=labels_sha256,
+                                          source=str(Path(a.lafan_labels).expanduser().resolve())),
                 snapshots={p.name:sha(p) for p in snapshots.iterdir()},motions=rows)
     atomic(out/'exclusions.json',dict(records=excluded))
     atomic(out/'manifest.json',report)

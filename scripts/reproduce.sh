@@ -1,5 +1,7 @@
 #!/bin/bash
-# Reproduce the main result: 3 seeds of the released recipe, every checkpoint evaluated on all 40 clips with 4
+# Upstream G1 benchmark reference; this is not the Dex reproduction entry.
+# Dex entry and requirements: README.md and deployment/README_recipe_20261107.md.
+# Reproduce the upstream main result: 3 seeds, every checkpoint evaluated on all 40 clips with 4
 # replicas (the simulator is not bitwise reproducible, so a borderline clip can flip between replicas), then the time
 # to target. Run on an otherwise idle GPU: the times are training wall-clock.
 # Checkpoints are evaluated in the layout of the reported runs: iterations 100-900 together (9 per batch) and

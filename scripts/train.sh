@@ -1,5 +1,7 @@
 #!/bin/bash
-# Train with the released recipe (scripts/presets.sh, PRESET[main]).
+# Upstream G1 reference launcher (scripts/presets.sh, PRESET[main]).
+# Dex entry: uv run dex-mimic train --config configs/dex_blink_recipe.json ...
+# See README.md and deployment/README_recipe_20261107.md for Dex data and gates.
 # Usage: bash scripts/train.sh <log_dir> [extra train.py flags, e.g. --seed 1]
 # About 7.8 min of training on an RTX 4090 for 3500 iterations. Python: $PYTHON, default "uv run python".
 set -eu

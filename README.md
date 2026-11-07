@@ -3,6 +3,7 @@
 基于 BlinkMimic 的 Dex 全身动作跟踪：导入机器人动作、训练策略、导出 ONNX，并通过 MuJoCo / ROS 回放和评测。训练核心来自 BlinkMimic `d264658`，Dex 资产与部署适配来自 Dex-SuperMimic。
 
 人体 BVH / SMPL-X 先在 [Dex-Retarget](https://github.com/luckylhf/Dex-Retarget) 转换并验收，本项目读取其机器人动作导出。
+`v8` 是 Dex-Retarget 支持的一种求解模式；本项目不直接运行人体重定向。
 
 ## 文档导航
 
@@ -35,10 +36,13 @@ uv run dex-mimic check
 uv run dex-mimic train \
   --config configs/dex_blink_recipe.json \
   --compact-reference /path/to/frozen/compact.pt \
-  --log_dir runs/new_fresh3500
+  --log_dir runs/new_fresh3500 \
+  --stop-file runs/new_fresh3500/STOP
 ```
 
 完整训练数据、checkpoint 和 `test/` 结果未随仓库提供，须自行准备或从已有实验环境取得；仓库包含三动作冻结评测 NPZ。
+
+请求保存并停止时，创建本轮 `--stop-file` 指定的文件。续训的 `--max_hours` 是含 checkpoint 已有时间的累计上限，示例见[部署说明](deployment/README.md#停止与续训时限)。`scripts/train.sh`、`scripts/reproduce.sh` 保留的是上游 G1 参考流程；Dex 训练使用上方入口。
 
 ## 导出与评测
 
@@ -62,3 +66,5 @@ ROS Humble 运行环境支持 Python 3.10。已有 ROS 环境按基础依赖安�
 ## 来源与许可
 
 见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)、[DEX_THIRD_PARTY.md](DEX_THIRD_PARTY.md) 和 [LICENSE](LICENSE)。
+
+当前源码与交付文件校验见 [source_hashes_current_20261107.json](source_hashes_current_20261107.json)；原 `source_hashes.json` 保留为历史快照。

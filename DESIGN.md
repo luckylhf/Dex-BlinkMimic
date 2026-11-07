@@ -1,4 +1,34 @@
-# Dex-Mimic engineering design
+# Dex-BlinkMimic engineering design
+
+## Version and applicability
+
+The active fixed-data experiment is described by `configs/dex_blink_recipe.json`
+and [the November 7 recipe](deployment/README_recipe_20261107.md). The early
+adapter design below remains as historical rationale, not a description of every
+current training path.
+
+| Area | Initial / legacy path | Fixed-data recipe (2026-11-07) |
+|---|---|---|
+| Root correction | Safe config enables root feedback and shaping | Extra root feedback and reward disabled |
+| References | Bounded shards, prefetch, difficulty memory and replay invalidation at swaps | Entire compact reference stays resident; no timed swaps or replay clearing |
+| Mirror / contact | Initially disabled pending checks | Mirror 0.5 with eligible-window selection; contact weight 0.25 after geometry checks |
+| Feature identity | Shard release checks motion/FK and model hashes | Compact receipt checks pack and dataset hashes; it does not lock all feature-code identities |
+| Evaluation | Strict and height-diagnostic historical profiles | `jump_tracking_v2`, with global position error reported separately |
+
+Human inputs are converted and assessed in Dex-Retarget, whose solver modes include
+`v8`. The local freeze script only copies robot NPZs and preserves historical
+quality labels supplied through `--lafan-labels`; it does not solve or regrade
+motions. Existing exploratory LAFAN data remain distinct from newly accepted data.
+
+`source_hashes.json` preserves the original 52-file source snapshot. The current
+source, configuration, maintenance scripts, tests and documentation are recorded in
+[source_hashes_current_20261107.json](source_hashes_current_20261107.json), excluding
+backups and generated experiment outputs. This is a file-identity receipt, not a
+runtime or motion-quality acceptance report. Regenerate it after changing covered
+files. The working tree must include the listed recipe/modules/scripts before a
+Git delivery; this maintenance change does not stage, commit or push them.
+
+## Historical adapter design
 
 The repository owns its configuration, data contract, simulator model and evaluation history. BlinkMimic supplies the differentiable world model, actor/critic update and optimization mechanisms. Dex supplies joint order, actuator physics, scalable data handling and deployment semantics. Human motion conversion is provided externally by [Dex-Retarget](https://github.com/luckylhf/Dex-Retarget).
 
