@@ -42,6 +42,12 @@ def load_release(project=ROOT):
         raise ValueError('Unexpected three-test preprocessing version')
     if {r['name'] for r in manifest['motions']} != set(REFERENCE_HASHES):
         raise ValueError('Incomplete three-test release')
+    missing = [row[kind] for row in manifest['motions'] for kind in ('motion', 'reference')
+               if not (root / row[kind]).is_file()]
+    if missing:
+        raise FileNotFoundError(
+            'Missing local evaluation assets: ' + ', '.join(missing)
+            + '. Supply authorized local NPZ files matching manifest.json; see ' + str(root / 'README.md'))
     for row in manifest['motions']:
         if row['reference_sha256'] != REFERENCE_HASHES[row['name']]:
             raise ValueError('Unexpected frozen reference identity')

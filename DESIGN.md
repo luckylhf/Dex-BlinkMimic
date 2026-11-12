@@ -15,8 +15,8 @@ current training path.
 | Feature identity | Shard release checks motion/FK and model hashes | Compact receipt checks pack and dataset hashes; it does not lock all feature-code identities |
 | Evaluation | Strict and height-diagnostic historical profiles | `jump_tracking_v2`, with global position error reported separately |
 
-Human inputs are converted and assessed in Dex-Retarget, whose solver modes include
-`v8`. The local freeze script only copies robot NPZs and preserves historical
+Human inputs are converted and assessed in Dex-Retarget.
+The local freeze script only copies robot NPZs and preserves historical
 quality labels supplied through `--lafan-labels`; it does not solve or regrade
 motions. Existing exploratory LAFAN data remain distinct from newly accepted data.
 
@@ -24,9 +24,7 @@ motions. Existing exploratory LAFAN data remain distinct from newly accepted dat
 source, configuration, maintenance scripts, tests and documentation are recorded in
 [source_hashes_current_20261107.json](source_hashes_current_20261107.json), excluding
 backups and generated experiment outputs. This is a file-identity receipt, not a
-runtime or motion-quality acceptance report. Regenerate it after changing covered
-files. The working tree must include the listed recipe/modules/scripts before a
-Git delivery; this maintenance change does not stage, commit or push them.
+runtime or motion-quality acceptance report. Regenerate it after changing covered files.
 
 ## Historical adapter design
 
@@ -73,4 +71,4 @@ Checkpoint formats, world-model targets, Muon/Adam states, actor buffers, replay
 
 ## Scope
 
-Use https://github.com/luckylhf/Dex-Retarget for all new human-motion conversion and kinematic quality assessment. BlinkMimic imports accepted outputs without solving or resampling them, and builds its own training features. Existing frozen data and historical evaluations retain their original provenance; this code update does not reconvert or regrade them, alter checkpoints, or start training.
+Use https://github.com/luckylhf/Dex-Retarget for all new human-motion conversion and kinematic quality assessment. BlinkMimic imports accepted outputs without solving or resampling them, and builds its own training features. Existing frozen data and historical evaluations retain their original provenance.

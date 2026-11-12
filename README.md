@@ -3,7 +3,6 @@
 基于 BlinkMimic 的 Dex 全身动作跟踪：导入机器人动作、训练策略、导出 ONNX，并通过 MuJoCo / ROS 回放和评测。训练核心来自 BlinkMimic `d264658`，Dex 资产与部署适配来自 Dex-SuperMimic。
 
 人体 BVH / SMPL-X 先在 [Dex-Retarget](https://github.com/luckylhf/Dex-Retarget) 转换并验收，本项目读取其机器人动作导出。
-`v8` 是 Dex-Retarget 支持的一种求解模式；本项目不直接运行人体重定向。
 
 ## 文档导航
 
@@ -40,7 +39,7 @@ uv run dex-mimic train \
   --stop-file runs/new_fresh3500/STOP
 ```
 
-完整训练数据、checkpoint 和 `test/` 结果未随仓库提供，须自行准备或从已有实验环境取得；仓库包含三动作冻结评测 NPZ。
+仓库提供三动作冻结评测的六份 NPZ、清单、哈希与预处理协议。完整训练数据、checkpoint 和 `test/` 结果需在本地准备。
 
 请求保存并停止时，创建本轮 `--stop-file` 指定的文件。续训的 `--max_hours` 是含 checkpoint 已有时间的累计上限，示例见[部署说明](deployment/README.md#停止与续训时限)。`scripts/train.sh`、`scripts/reproduce.sh` 保留的是上游 G1 参考流程；Dex 训练使用上方入口。
 
@@ -61,10 +60,14 @@ ROS Humble 运行环境支持 Python 3.10。已有 ROS 环境按基础依赖安�
 
 2026-11-07 固定数据实验完成从头训练 3500 次，训练数据为 BONES 26,815 条和探索性 LAFAN 77 条。评测动作中 GBTC 由视频转换得到（与训练数据无关），另两条为 LAFAN 走跑动作：GBTC 与两条走跑动作播放到结尾，高动态舞蹈仍提前终止，全局位置漂移明显。
 
-本地完整结果包见 [结果、8 段视频与训练曲线](test/results/blink_recipe_fresh3500_20261107/README.md)（`test/` 被 Git 忽略）。该轮使用 11 月 7 日更新参考及独立评测历史，保留了原冻结基准。播放完成与轨迹跟踪精度分别报告；现有结果为仿真验证，真机验收仍需另做。
+完整指标、8 段视频与训练曲线保存在实验环境的 `test/results/blink_recipe_fresh3500_20261107/README.md`。该轮使用 11 月 7 日更新参考及独立评测历史，保留了原冻结基准。播放完成与轨迹跟踪精度分别报告，现有结果为仿真验证，真机验收仍需另做。
 
 ## 来源与许可
 
 见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)、[DEX_THIRD_PARTY.md](DEX_THIRD_PARTY.md) 和 [LICENSE](LICENSE)。
 
-当前源码与交付文件校验见 [source_hashes_current_20261107.json](source_hashes_current_20261107.json)；原 `source_hashes.json` 保留为历史快照。
+Training data includes Motion Data by Bones Studio. Use of the underlying dataset is subject to the BONES Motion Capture Dataset License Agreement. [Bones Studio](https://bones.studio/) · [BONES-SEED license](https://bones.studio/info/seed-license)
+
+LAFAN1 由 Ubisoft La Forge 提供，使用和分发遵循其 [CC BY-NC-ND 4.0 许可](https://github.com/ubisoft/ubisoft-laforge-animation-dataset/blob/master/license.txt)。
+
+文件校验清单见 [source_hashes_current_20261107.json](source_hashes_current_20261107.json)。

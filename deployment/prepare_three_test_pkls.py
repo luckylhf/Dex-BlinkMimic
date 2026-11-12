@@ -15,10 +15,10 @@ def main():
     parser.add_argument('--inputs', type=Path, help='PKL directory; default: root/inputs or project/test/videos')
     args = parser.parse_args()
     root = args.root.resolve()
-    release, manifest = load_release()
     inputs = args.inputs or (root / 'inputs' if (root / 'inputs').is_dir() else ROOT / 'test/videos')
     if any((root / x).exists() for x in ('motions', 'references', 'suite.json', 'history', 'input_receipt.json')):
         raise FileExistsError('Use a new study directory; historical references and results are immutable')
+    release, manifest = load_release()
     # Changed PKLs need a new protocol version; never substitute another input's references.
     for row in manifest['motions']:
         if sha(inputs / row['input_file']) != row['input_pkl_sha256']:

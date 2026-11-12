@@ -1,8 +1,8 @@
 # 固定数据 Blink 配方（2026-11-07）
 
-本轮从随机初始化训练 3500 次，采用 BlinkMimic `PRESET[main]` 并适配 Dex。其 SuperMimic 基线来自第三方重实现；上游 G1 的性能数据不能直接用于本项目。
+本轮从随机初始化训练 3500 次，采用 BlinkMimic `PRESET[main]` 并适配 Dex。其 SuperMimic 基线来自第三方重实现，性能以 Dex 的实际评测结果为准。
 
-实验已完成。本地结果包见[指标、8 段视频与曲线](../test/results/blink_recipe_fresh3500_20261107/README.md)（未随 Git 仓库提供）。本页集中说明数据、参数、显存适配与复现条件。
+实验已完成。指标、8 段视频与训练曲线保存在本地 `test/results/blink_recipe_fresh3500_20261107/README.md`。本页说明数据、参数、显存适配与复现条件。
 
 ## 固定数据
 
@@ -13,7 +13,11 @@
 | 合计 | 26,892 条、6,006,647 帧、133,066 个一秒时间桶 |
 | 排除的人工镜像源 | 8,738 条 |
 
-`freeze_recipe_dataset.py` 复制已完成批次的验收清单和选用 NPZ，排除源文件名以 `_M` 结尾的条目，并按源 SHA-256、训练文件 SHA-256、统一四元数符号后的动作数组哈希去重。保留条目未发现这三类完全重复；相似录制和独立左右动作仍保留。
+Training data includes Motion Data by Bones Studio. Use of the underlying dataset is subject to the BONES Motion Capture Dataset License Agreement. [Bones Studio](https://bones.studio/) · [BONES-SEED license](https://bones.studio/info/seed-license)
+
+LAFAN1 由 Ubisoft La Forge 提供，适用 CC BY-NC-ND 4.0。数据下载、转换、训练和成果分享按对应许可及授权执行。[LAFAN1 官方许可](https://github.com/ubisoft/ubisoft-laforge-animation-dataset/blob/master/license.txt)
+
+`freeze_recipe_dataset.py` 复制已完成批次的验收清单和选用 NPZ，排除源文件名以 `_M` 结尾的条目，并按源 SHA-256、训练文件 SHA-256、统一四元数符号后的动作数组哈希去重；相似录制和独立左右动作仍保留。
 
 训练快照拥有独立文件副本。全程固定该快照，按上游均匀一秒时间桶先验结合回报/失败统计采样；不做 LAFAN/BONES 各半加权，也不动态接入新转换结果。
 
@@ -58,7 +62,7 @@ Dex 腰 yaw 限位不对称。镜像样本只选当前/下一帧均在对称可�
 
 上游一次为所有动作窗口分配仿真实例，本轮限制为 2048 个探测实例。第 1000 次后每 125 次轮换一批，覆盖记录写入 `probe_coverage.jsonl`；完整 checkpoint 保存游标与探测状态。
 
-每次只扫描部分窗口，失败权重按该批次衰减 0.7。因此它与上游“一次全库扫描、每轮衰减”的调度不同；即使累计覆盖全库，也不代表最终模型完成了一次全库验收。
+每次扫描一批窗口，并将该批次的失败权重衰减 0.7。探测用于调整采样权重，最终模型需单独评测。
 
 ## 准备与运行
 
@@ -83,7 +87,22 @@ PYTHONPATH=src .venv/bin/python deployment/freeze_recipe_dataset.py \
 
 `--batches` 下应有 `Retarget_*/accepted.json`；`--lafan` 须有完整的 77 个训练 NPZ。`--lafan-labels` 是含 `motions` 列表的 JSON，每条 LAFAN 记录须含 `name`、`training_sha256`、`original_quality_status`、`original_quality_flags`；混合清单用 `corpus: "lafan"` 标识 LAFAN 条目。
 
-`all77_data_receipt.json` 由 `prepare_lafan_all77.py` 在本地生成，不随仓库发布（含数据集元数据与内部路径）；用于对应的历史 77 条输入时，文件名和 SHA-256 必须一致，换过输入时须提供匹配的新回执。脚本在创建输出目录前检查动作数量、标签完整性及文件哈希，原样保留 accepted/review 标签和 flags，并将标签清单复制为 `lafan_quality_labels.json`、在 manifest 中登记哈希。无需补造旧 `data/mixed/.../manifest.json`。
+`all77_data_receipt.json` 由 `prepare_lafan_all77.py` 生成，需与输入文件名和 SHA-256 匹配。更换输入时提供对应的新标签清单。脚本在创建输出目录前检查动作数量、标签完整性及文件哈希，原样保留 accepted/review 标签和 flags，并将标签清单复制为 `lafan_quality_labels.json`、在 manifest 中登记哈希。
+
+### 环境检查与训练短测
+
+完成快照准备后，在训练环境依次执行。两个短测分别使用新目录：
+
+```bash
+PYTHONPATH=src .venv/bin/python deployment/check_recipe_environment.py \
+  --dataset data/frozen/new_recipe --build --report runs/recipe_preflight.json
+PYTHONPATH=src .venv/bin/python deployment/run_recipe_smoke.py \
+  --dataset data/frozen/new_recipe --out runs/recipe_smoke_small
+PYTHONPATH=src .venv/bin/python deployment/run_recipe_smoke.py \
+  --dataset data/frozen/new_recipe --out runs/recipe_smoke_full --full
+```
+
+检查和短测通过后，使用主 README 的训练命令，将 `--compact-reference` 指向 `data/frozen/new_recipe/compact.pt`。
 
 ## 评测与已完成结果
 

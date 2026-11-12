@@ -1,0 +1,14 @@
+include data/README.md
+include data/evaluation/supermimic_12341_v1/README.md
+include data/evaluation/supermimic_12341_v1/manifest.json
+include data/evaluation/supermimic_12341_v1/suite.json
+global-exclude lafan1_surfaces.json fbx_bind_geometry.json
+global-exclude *.fbx *.FBX *.bvh *.npz *.pkl *.pt *.onnx *.mjb *.mp4 *.gif
+global-exclude *.csv *.parquet *.jsonl *.usd *.usda *.usdc
+global-exclude *.ckpt *.pth *.safetensors
+include data/evaluation/supermimic_12341_v1/motions/gbtc.npz
+include data/evaluation/supermimic_12341_v1/motions/dance_boy.npz
+include data/evaluation/supermimic_12341_v1/motions/dance_girl.npz
+include data/evaluation/supermimic_12341_v1/references/gbtc.npz
+include data/evaluation/supermimic_12341_v1/references/dance_boy.npz
+include data/evaluation/supermimic_12341_v1/references/dance_girl.npz

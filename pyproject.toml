@@ -37,3 +37,6 @@ dex-mimic = "dex_mimic.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.exclude-package-data]
+"*" = ["*lafan1_surfaces.json", "*fbx_bind_geometry.json", "*.fbx", "*.FBX", "*.bvh", "*.npz", "*.pkl", "*.pt", "*.ckpt", "*.pth", "*.safetensors", "*.onnx", "*.mjb", "*.mp4", "*.gif", "*.csv", "*.parquet", "*.jsonl", "*.usd", "*.usda", "*.usdc"]
+

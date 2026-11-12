@@ -1,6 +1,6 @@
 # 跳跃评测规则修正：jump_tracking_v2
 
-2026-11-06 起，当前三小时续训的评测使用 `jump_tracking_v2`，新建评测默认也使用该版本。
+新建评测默认使用 `jump_tracking_v2`。该规则从 2026-11-06 的评测开始采用。
 
 - 相对参考骨盆高度误差超过 0.25 米：只记录跟踪超差，不终止，不认定摔倒。
 - 相对参考的旋转矩阵竖直分量差超过 0.8：保留倾斜超差终止保护。这是姿态跟踪代理指标，不能单独认定物理摔倒。
@@ -9,14 +9,14 @@
 - `outcome` 明确区分完成、完成但有跟踪超差、倾斜终止、旧协议高度终止和步数上限；`physical_fall_detected=null` 表示未执行可靠的摔倒判定。兼容字段 `failed` 仅表示触发协议终止。
 - 报告包含高度超差帧数、累计时间、最大高度误差；视频显示高度偏差及具体终止原因。
 
-判据实现：`src/dex_mimic/evaluation/criteria.py`；物理回放接入：`src/dex_mimic/deployment/native_mujoco.py`。训练端 `src/blinkmimic/mdp.py` 的硬终止和软终止均未修改，正在运行的训练进程继续使用原包参数。
+判据实现：`src/dex_mimic/evaluation/criteria.py`；物理回放接入：`src/dex_mimic/deployment/native_mujoco.py`。训练端的终止规则由 `src/blinkmimic/mdp.py` 独立管理。
 
-远端当前评测：`evaluations/progress3h_20261106_153921_jump_v2`。本地结果：`test/results/progress3h_20261106_153921_jump_v2`。第 1899 次历史种子、3500 次基线、4600/5828 次半小时保存点均以新协议重新评测，并重新建立最佳记录。后续半小时任务仍沿原时间表，训练截止仍为 18:39:22。
+## 历史验证（2026-11-06）
 
-旧 `progress3h_20261106_153921` 和 `latest_test_20261106_1430` 保留 `strict_v1` 证据；不可与新协议的终止时长直接比较。旧三 PKL 专用脚本属于该固定历史实验，仍显式使用旧协议；后续以 `deployment/current_progress_study.txt` 指向的新评测为准。
+评测目录为 `evaluations/progress3h_20261106_153921_jump_v2`，本地结果位于 `test/results/progress3h_20261106_153921_jump_v2`。第 1899、3500、4600 和 5828 次保存点按新协议重评，并重新建立最佳记录。
+
+旧 `progress3h_20261106_153921` 和 `latest_test_20261106_1430` 使用 `strict_v1`。比较时使用相同协议的评测结果。
 
 实际验证：同一个第 4600 次 EMA 在旧规则下于 33.34 秒高度超差终止；新规则下该时刻继续，33.46 秒高度误差回到阈值内，74.72 秒触发倾斜超差终止。此前 1667 步的 qpos 与旧回放完全相同。这里只修正了评测截断与分类，不表示策略经过训练后获得提升。
 
 4 项回归检查覆盖记录的跳跃帧、超差后恢复与完整播放、倾斜保护、阈值边界/无效协议。运行：`PYTHONPATH=src python -m unittest discover -s tests -v`。
-
-迁移只替换空闲评测控制器，训练 PID 和独立截止守护进程保留；该轮的补丁备份和哈希清单仅在维护者本地保留，不随仓库发布。

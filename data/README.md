@@ -60,4 +60,4 @@ uv run dex-mimic data build \
 
 构建前会再次核对导入副本与回执。固定全库 `compact.pt` 的准备方式见[固定数据配方](../deployment/README_recipe_20261107.md)，与上述分片流程分开使用。
 
-转换端负责运动学验收；策略的动力学跟踪与平衡通过后续评测判断。本项目已移除原 `data convert` 和 `data check-speed` 入口。
+转换端负责运动学验收；导入后通过策略评测检查动态跟踪与平衡。

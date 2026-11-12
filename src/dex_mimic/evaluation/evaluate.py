@@ -65,6 +65,9 @@ def evaluate(a):
     for name,row in suite['references'].items():
         if not name.replace('_','').replace('-','').isalnum():raise ValueError('Invalid case name')
         ref=Path(row['reference']); ref=ref if ref.is_absolute() else suite_path.parent/ref
+        if not ref.is_file():
+            raise FileNotFoundError('Missing local evaluation reference: '+str(ref)+
+                                    '. Supply authorized local NPZ files described in the evaluation README.')
         if sha(ref)!=row['reference_sha256']:raise ValueError('Reference hash mismatch: '+name)
         refs[name]=ref.resolve()
     preprocessing=validate_references(refs, getattr(a, 'allow_legacy_three_tests', False))
