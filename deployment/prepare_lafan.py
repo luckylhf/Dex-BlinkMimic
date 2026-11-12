@@ -3,10 +3,11 @@ from pathlib import Path
 import collections
 import hashlib
 import json
+import os
 import shutil
 
 root = Path(__file__).resolve().parents[1]
-original = Path('/home/longhongfeng/Desktop/Data/LAFAN1/02_Dex转换数据/Retarget_061_全量77_20261106_095755')
+original = Path(os.environ.get('DEX_LAFAN_BATCH','/path/to/LAFAN1/02_Dex转换数据/Retarget_061_全量77'))
 copied = root / 'data/lafan1' / original.name
 out = root / 'data/lafan1/motions_accepted'
 out.mkdir(exist_ok=True)

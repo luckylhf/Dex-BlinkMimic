@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd /home/longhongfeng/Desktop/Dex-BlinkMimic
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 root="$PWD/evaluations/latest_test_20261106_1430"
 render_pid=$(cat "$root/render.pid")
 while kill -0 "$render_pid" 2>/dev/null; do sleep 2; done

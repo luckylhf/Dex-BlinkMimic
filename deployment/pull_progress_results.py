@@ -9,7 +9,7 @@ import time
 
 remote, output = sys.argv[1:3]
 out = Path(output).resolve(); out.mkdir(parents=True, exist_ok=True)
-assert str(Path(remote).parent) == '/home/longhongfeng/Desktop/Dex-BlinkMimic/evaluations'
+assert Path(remote).parent.name == 'evaluations'
 assert Path(remote).name.startswith(('progress3h_','progress1h_'))
 assert all(c.isalnum() or c in '/_-' for c in remote)
 deadline = time.time()+24*3600

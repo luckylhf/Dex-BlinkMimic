@@ -18,7 +18,7 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--out',required=True);a=p.parse_args()
     root=Path.cwd();out=Path(a.out).resolve();out.mkdir(parents=True,exist_ok=False)
     motions=out/'motions';motions.mkdir();evidence=out/'evidence';evidence.mkdir()
-    batch=Path('/home/longhongfeng/Desktop/Data2/BONES-SEED/02_Dex转换数据/Retarget_080_full_20261106')
+    batch=Path(os.environ.get('DEX_BONES_BATCH','/path/to/BONES-SEED/02_Dex转换数据/Retarget_080_full'))
     raw=(batch/'accepted.json').read_bytes();(out/'accepted_snapshot.json').write_bytes(raw)
     accepted=json.loads(raw)['motions'];rows=[];excluded=[]
     for i,entry in enumerate(accepted):

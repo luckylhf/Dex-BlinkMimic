@@ -132,7 +132,7 @@ def main():
                 pids['data_updater'] = reused_updater
     for name, argv, logfile, child_env in [
         ('data_updater', [str(root/'deployment/update_live_bones.py'), '--live', str(live),
-            '--batches', '/home/longhongfeng/Desktop/Data2/BONES-SEED/02_Dex转换数据',
+            '--batches', os.environ.get('DEX_BONES_DIR','/path/to/BONES-SEED/02_Dex转换数据'),
             '--deadline', str(deadline_epoch)], live/'updater.log', dict(env, CUDA_VISIBLE_DEVICES='', OMP_NUM_THREADS='2')),
         ('deadline_guard', [str(root/'deployment/progress_deadline_guard.py'), str(study)], study/'deadline_guard.log', env),
         ('controller', [str(root/'deployment/progress_controller.py'), str(study)], study/'controller.log', env),

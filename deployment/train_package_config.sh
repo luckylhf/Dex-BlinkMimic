@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd /home/longhongfeng/Desktop/Dex-BlinkMimic
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 export DEX_MIMIC_ROOT="$PWD"
 export DEX_ASSETS="$PWD/assets/dex_evt"
 export PYTHONPATH="$PWD/src"
