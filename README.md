@@ -11,8 +11,8 @@
 |---|---|
 | 导入新动作、构建训练特征 | [数据导入](data/README.md) |
 | 使用固定数据 Blink 配方 | [配方、环境检查与显存适配](deployment/README_recipe_20261107.md) |
-| 评测 GBTC、dance-boy、dance-girl | [三动作冻结评测集](data/evaluation/supermimic_12341_v1/README.md) |
-| 查看 luckylhf 路径和历史训练 | [部署与运行记录](deployment/README.md) |
+| 评测 GBTC、dance-boy、dance-girl（视频转换动作） | [三动作冻结评测集](data/evaluation/supermimic_12341_v1/README.md) |
+| 查看部署流程与运行记录 | [部署与运行记录](deployment/README.md) |
 
 ## 安装与训练
 
@@ -59,7 +59,7 @@ ROS Humble 运行环境支持 Python 3.10。已有 ROS 环境按基础依赖安�
 
 ## 已记录结果
 
-2026-11-07 固定数据实验完成从头训练 3500 次，数据为 BONES 26,815 条和探索性 LAFAN 77 条。GBTC 和两条 LAFAN 走跑动作播放到结尾，高动态舞蹈仍提前终止，全局位置漂移明显。
+2026-11-07 固定数据实验完成从头训练 3500 次，训练数据为 BONES 26,815 条和探索性 LAFAN 77 条。评测动作中 GBTC 由视频转换得到（与训练数据无关），另两条为 LAFAN 走跑动作：GBTC 与两条走跑动作播放到结尾，高动态舞蹈仍提前终止，全局位置漂移明显。
 
 本地完整结果包见 [结果、8 段视频与训练曲线](test/results/blink_recipe_fresh3500_20261107/README.md)（`test/` 被 Git 忽略）。该轮使用 11 月 7 日更新参考及独立评测历史，保留了原冻结基准。播放完成与轨迹跟踪精度分别报告；现有结果为仿真验证，真机验收仍需另做。
 

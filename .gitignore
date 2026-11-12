@@ -7,6 +7,20 @@
 # 超过 GitHub 单文件 100MB 限制的展示视频
 /牛逼效果展示/
 
+# 历史运行记录、回执与回滚补丁（含内部路径和数据集元数据），不发布
+/deployment/preflight.json
+/deployment/environment_freeze.txt
+/deployment/local_source_manifest.json
+/deployment/*_receipt.json
+/deployment/all77_*.json
+/deployment/current_*.txt
+/deployment/previous_*.txt
+/deployment/BONES_MIX_1H.md
+/deployment/LIVE_BONES_UNTIL_NOON.md
+/deployment/bones_mix1h_receipts_*/
+/deployment/patch_*/
+/deployment/recipe_backup_*/
+
 # Python
 __pycache__/
 *.py[cod]

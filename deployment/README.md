@@ -1,20 +1,19 @@
 # luckylhf 部署与运行记录
 
-远端项目目录：`/home/longhongfeng/Desktop/Dex-BlinkMimic`，环境为 `.venv`。部署对象是本项目的 Dex 适配版；内附 G1 源码快照保留作来源参考。
+部署对象是本项目的 Dex 适配版；内附 G1 源码快照保留作来源参考。环境为 `.venv`，路径按各自部署目录调整。
 
 | 内容 | 入口 |
 |---|---|
 | 2026-11-07 固定数据 Blink 配方 | [配置与运行条件](README_recipe_20261107.md) |
 | 导入新机器人动作 | [数据导入](../data/README.md) |
 | 标准三动作参考、评测命令与历史隔离 | [冻结评测集](../data/evaluation/supermimic_12341_v1/README.md) |
-| 2026-11-06 动态 BONES 续训方案（已停止） | [历史方案](LIVE_BONES_UNTIL_NOON.md) |
 
 ## 运行目录与状态
 
-`current_run.txt` 等指针保存上次登记路径，不能单凭文件名判断进程仍在运行。到远端项目目录查看登记任务及进程：
+`current_run.txt` 等指针保存上次登记路径，由训练脚本在本地生成，不随仓库发布；不能单凭文件名判断进程仍在运行。到部署目录查看登记任务及进程：
 
 ```bash
-cd /home/longhongfeng/Desktop/Dex-BlinkMimic
+cd /path/to/Dex-BlinkMimic
 bash deployment/status.sh
 run_dir=$(cat deployment/current_run.txt)
 tail -f "$run_dir/stdout.log"
@@ -30,7 +29,7 @@ touch "$run_dir/STOP"
 
 `--resume` 恢复后，`--max_hours` 按 **checkpoint 的 `wall_time` + 本次训练时间**判断，单位为小时。它不是新增训练时长：已有 42 分钟、希望再训 30 分钟，应传累计上限 `--max_hours 1.2`；传 `0.5` 会在恢复后的迭代检查处触发保存退出。该参数不改变迭代上限，续训还须确保 `--iterations` 大于恢复的迭代数。
 
-`environment_setup.log`、`environment_freeze.txt`、`preflight.json` 保存环境记录；每轮的 `args.json` 保存生效参数。16 GiB vGPU 的显存适配见配方文档，耗时以实际运行记录为准。
+`environment_setup.log`、`environment_freeze.txt`、`preflight.json` 等环境记录在本地运行时生成，不随仓库发布；每轮的 `args.json` 保存生效参数。16 GiB vGPU 的显存适配见配方文档，耗时以实际运行记录为准。
 
 ## 历史 LAFAN 试跑
 
@@ -38,14 +37,14 @@ touch "$run_dir/STOP"
 
 数据目录 `data/lafan1/Retarget_061_全量77_20261106_095755` 保留原批次，训练副本为 `data/lafan1/motions_all77_exploratory/`：77 段、827,691 帧、50 Hz。原质量为 **2 accepted、75 review**，全量探索试跑保留这些标签。
 
-accepted 动作采用原选定版本，review 动作取最后一次完整输出；共 v8 39 段、frax 23 段、hybrid 15 段。适配只整理字段及 XYZW → WXYZ 四元数顺序，逐段核对数组一致性，没有重新重定向。来源、选用版本和哈希见 `data_receipt.json`、`all77_data_receipt.json` 及每轮 `data_manifest.json`；质量报告在输入目录的 `evidence/`。
+accepted 动作采用原选定版本，review 动作取最后一次完整输出；共 v8 39 段、frax 23 段、hybrid 15 段。适配只整理字段及 XYZW → WXYZ 四元数顺序，逐段核对数组一致性，没有重新重定向。来源、选用版本和哈希见本地生成的 `data_receipt.json`、`all77_data_receipt.json`（由 `prepare_lafan*.py` 产出，不随仓库发布）及每轮 `data_manifest.json`；质量报告在输入目录的 `evidence/`。
 
 | 阶段 | 记录 |
 |---|---|
 | 仅两条 accepted 动作 | `runs/lafan_accepted_4096_20261106_120542`，完成 3500 次 |
 | 全量 77 段、4096 环境保守试跑 | `runs/lafan_all77_exploratory_4096_20261106_132307`，第 963 次保存并停止 |
 | 全量 77 段、原包 8192 环境配置 | 使用 `train_package_config.sh`，从随机初始化开始；后续续训单独留档 |
-| 从第 12659 次接入动态 BONES | 已按用户要求停止；保存点及评测保留，原方案见上方链接 |
+| 从第 12659 次接入动态 BONES | 已按用户要求停止；保存点及评测保留（该轮方案文档不随仓库发布） |
 
 ### 复现原包配置
 
@@ -56,7 +55,7 @@ accepted 动作采用原选定版本，review 动作取最后一次完整输出�
 ```bash
 run_dir="runs/lafan_all77_package8192_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$run_dir"
-cp deployment/all77_data_receipt.json "$run_dir/data_manifest.json"
+cp /path/to/all77_data_receipt.json "$run_dir/data_manifest.json"
 printf '%s\n' "$run_dir" > deployment/current_run.txt
 nohup bash deployment/train_package_config.sh "$run_dir" > "$run_dir/stdout.log" 2>&1 < /dev/null &
 printf '%s\n' "$!" > "$run_dir/train.pid"

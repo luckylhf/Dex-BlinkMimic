@@ -77,16 +77,16 @@ Dex 腰 yaw 限位不对称。镜像样本只选当前/下一帧均在对称可�
 PYTHONPATH=src .venv/bin/python deployment/freeze_recipe_dataset.py \
   --batches /path/to/BONES/batches \
   --lafan /path/to/LAFAN/motions \
-  --lafan-labels deployment/all77_data_receipt.json \
+  --lafan-labels /path/to/all77_data_receipt.json \
   --out data/frozen/new_recipe
 ```
 
 `--batches` 下应有 `Retarget_*/accepted.json`；`--lafan` 须有完整的 77 个训练 NPZ。`--lafan-labels` 是含 `motions` 列表的 JSON，每条 LAFAN 记录须含 `name`、`training_sha256`、`original_quality_status`、`original_quality_flags`；混合清单用 `corpus: "lafan"` 标识 LAFAN 条目。
 
-包内 `all77_data_receipt.json` 可用于对应的历史 77 条输入，文件名和 SHA-256 必须一致；换过输入时须提供匹配的新回执。脚本在创建输出目录前检查动作数量、标签完整性及文件哈希，原样保留 accepted/review 标签和 flags，并将标签清单复制为 `lafan_quality_labels.json`、在 manifest 中登记哈希。无需补造旧 `data/mixed/.../manifest.json`。
+`all77_data_receipt.json` 由 `prepare_lafan_all77.py` 在本地生成，不随仓库发布（含数据集元数据与内部路径）；用于对应的历史 77 条输入时，文件名和 SHA-256 必须一致，换过输入时须提供匹配的新回执。脚本在创建输出目录前检查动作数量、标签完整性及文件哈希，原样保留 accepted/review 标签和 flags，并将标签清单复制为 `lafan_quality_labels.json`、在 manifest 中登记哈希。无需补造旧 `data/mixed/.../manifest.json`。
 
 ## 评测与已完成结果
 
 在零更新和最终模型上评测 GBTC、dance-boy、dance-girl，以及代表性 LAFAN 走跑动作。LAFAN 两条属于训练内；三个常用开发动作也不能称为盲测。终止采用 `jump_tracking_v2`，全局位置误差单独报告，训练端终止规则保持原配置。
 
-本轮使用 11 月 7 日更新素材、既定 SuperMimic 预处理和独立 history，未覆盖[历史冻结三动作集](../data/evaluation/supermimic_12341_v1/README.md)。训练完成后，GBTC 和两条 LAFAN 播放到结尾，舞蹈仍有提前终止，全局漂移明显。详细指标及验证记录见本页开头的结果包；这些仿真结果不代表全部动作或真机验收。
+本轮使用 11 月 7 日更新素材、既定 SuperMimic 预处理和独立 history，未覆盖[历史冻结三动作集](../data/evaluation/supermimic_12341_v1/README.md)。训练完成后，GBTC（视频转换的评测动作，非数据集来源）和两条 LAFAN 播放到结尾，舞蹈仍有提前终止，全局漂移明显。详细指标及验证记录见本页开头的结果包；这些仿真结果不代表全部动作或真机验收。

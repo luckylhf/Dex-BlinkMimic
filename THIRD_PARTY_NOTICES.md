@@ -63,3 +63,11 @@ their own distributions under their own licenses (Apache-2.0, BSD-3-Clause and o
 The LAFAN1 motions (Ubisoft La Forge, CC BY-NC-ND 4.0) and the Unitree G1 description (BSD-3-Clause) are downloaded
 by `tools/download_data.sh` and are not redistributed here either; files derived from LAFAN1 (videos, GIFs,
 checkpoints) are not covered by this repository's MIT License.
+
+The evaluation motions in `data/evaluation/supermimic_12341_v1/` are not dataset excerpts: they were produced by
+extracting human motion from the GBTC / dance-boy / dance-girl videos and converting it to Dex robot motion. They are
+not derived from BONES-SEED, LAFAN1 or any other motion dataset and are not used for training.
+
+The BONES-SEED dataset (https://huggingface.co/datasets/bones-studio/seed) is a gated dataset under its own
+`bones-seed-license`; no BONES-SEED motion data, motion names, statistics or receipts are redistributed in this
+repository. Training on BONES-SEED requires obtaining the data directly from the publisher and accepting its terms.

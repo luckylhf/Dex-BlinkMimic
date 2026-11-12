@@ -3,7 +3,7 @@
   "reference_preprocessing": "supermimic_12341_three_tests_v1",
   "evaluation_profile": "jump_tracking_v2",
   "model_sha256": "17573c55d1c9d9d43b2e44a5e3ebc237027bfcfb6f5b5d928aa0205792548194",
-  "provenance": "Byte-identical frozen motions and references from verified local Dex-SuperMimic 12341 package; no policy or compiled model copied.",
+  "provenance": "Video-derived: human motion extracted from the GBTC / dance-boy / dance-girl videos, converted to Dex robot motion (PKL), then resampled to 50 Hz NPZ. Not derived from BONES-SEED, LAFAN1 or any other motion dataset, and not used for training. Byte-identical frozen motions and references from verified local Dex-SuperMimic 12341 package; no policy or compiled model copied.",
   "rule": "At 50 Hz, skip to the first one-step maximum absolute joint velocity below 1.5 rad/s for GBTC and dance-boy; standing FK foot-ground alignment, quintic position/joint transition, quaternion SLERP; dance-girl original_start is retained without cropping or transitions.",
   "motions": [
     {

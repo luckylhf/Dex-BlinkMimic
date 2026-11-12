@@ -1,6 +1,10 @@
 # 三动作冻结评测集
 
-版本：`supermimic_12341_three_tests_v1`。本目录保存旧 Dex-SuperMimic 12341 的三份已处理动作和三份参考 NPZ，逐文件哈希见 [manifest.json](manifest.json)，评测入口见 [suite.json](suite.json)。六个 NPZ 与旧包逐字节一致，已纳入当前仓库。
+版本：`supermimic_12341_three_tests_v1`。本目录保存三份冻结评测动作和三份参考 NPZ，逐文件哈希见 [manifest.json](manifest.json)，评测入口见 [suite.json](suite.json)。六个 NPZ 与旧包逐字节一致，已纳入当前仓库。
+
+## 动作来源
+
+三个动作的原始素材是 GBTC、dance-boy、dance-girl **视频**：先从视频提取人体动作，再转换为匹配 Dex 模型的机器人动作（PKL），最后重采样为 50 Hz NPZ。它们**不是** BONES-SEED、LAFAN1 或任何其他训练数据集的片段，也不是这些数据集的转换产物，且不进入训练来源清单。
 
 ## 参考处理
 
@@ -10,7 +14,7 @@
 | dance-boy | 5 帧 / 0.10 秒 | 1 秒站立 + 1 秒过渡 | 2.5 秒回站立 + 1 秒保持 | 80.20 秒 |
 | dance-girl | 不裁剪 | 保留原始开头 `original_start` | 无过渡 | 241.56 秒 |
 
-裁剪在机器人 PKL 重采样为 50 Hz NPZ 后进行。GBTC、dance-boy 的保留起点是首个满足 `max_j(abs(q[i+1,j]-q[i,j])) * 50 < 1.5 rad/s` 的位置。这是单步关节速度启发式；表中裁剪量只对应这两份输入，不代表通用裁剪时长，也未检查根部角速度或连续稳定窗口。
+裁剪在机器人 PKL 重采样为 50 Hz NPZ 后进行。该 PKL 由上述视频转换得到，不来自任何动作数据集。GBTC、dance-boy 的保留起点是首个满足 `max_j(abs(q[i+1,j]-q[i,j])) * 50 < 1.5 rad/s` 的位置。这是单步关节速度启发式；表中裁剪量只对应这两份输入，不代表通用裁剪时长，也未检查根部角速度或连续稳定窗口。
 
 站姿由匹配模型的正向运动学（FK）生成，按足底碰撞几何落地；位置和关节使用五次曲线过渡，旋转使用四元数 SLERP，随后计算速度。回放从最终参考首帧的位置、姿态和速度初始化。
 
